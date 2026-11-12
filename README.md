@@ -7,6 +7,9 @@ Honors 241 team portfolio site.
 | `index.html` | Home page (DeepDream background, welcome, member cards) |
 | `team.html` | "Simmias' House", the team builds page: Build 2 intro + bibliography, team illustrations, Build 6 conclusion |
 | `members/varsha.html`, `justin.html`, etc. (6 pages) | One page per member: journal, Build 7 writings, Build 8 illustration |
+| `characters.html` + `characters.js` | Interactive character map. **Edit `characters.js`** to change who's on it, their descriptions, and their Westworld echoes |
+| `maze.html` | Scroll-driven maze that links to every page (member stops come from `site.js` automatically) |
+| `glossary.js` | Hover definitions. Add or edit terms here |
 | `images/` | Put all pictures here |
 | `site.js` | **Site name and member names live here.** Change them once and every menu updates |
 | `style.css` | Colors and fonts (top of the file) |
@@ -36,3 +39,7 @@ Honors 241 team portfolio site.
 - Italics (book titles): `<em>Lives</em>`
 - Journal entry: copy a whole `<div class="journal-entry"> … </div>` block
 - If your text contains `<` or `&`, write `&lt;` or `&amp;` instead.
+
+## Analysis mode margin notes
+Add a note that only shows in Analysis mode by putting this right before a paragraph:
+`<aside class="note"><span class="mono">Label</span>Your note</aside>`

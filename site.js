@@ -44,12 +44,38 @@ const SITE = {
     <nav id="site-nav">
       ${link(root + "index.html", "Home", "index.html", "The Voice")}
       ${link(root + "team.html", "Simmias' House", "team.html", "Team Builds")}
+      ${link(root + "characters.html", "Characters", "characters.html", "The Map")}
+      ${link(root + "maze.html", "The Maze", "maze.html", "Find your way")}
       <details class="members-menu"${onMemberPage ? ' data-current="true"' : ""}>
         <summary>The Hosts<small>Members</small></summary>
         <div class="members-list">${memberLinks}</div>
       </details>
+      <button class="analysis-toggle" aria-pressed="false" title="Analysis mode: dark diagnostic view with annotations">
+        <span class="led"></span>Analysis<small>Mode</small>
+      </button>
     </nav>`;
   document.body.prepend(header);
+
+  /* ---------------- Analysis mode ---------------- */
+  const aBtn = header.querySelector(".analysis-toggle");
+  const setAnalysis = (on, animate) => {
+    document.documentElement.classList.toggle("analysis", on);
+    aBtn.setAttribute("aria-pressed", on);
+    if (animate) {
+      document.body.classList.remove("glitch"); void document.body.offsetWidth;
+      document.body.classList.add("glitch");
+    }
+    try { localStorage.setItem("analysis", on ? "1" : "0"); } catch (e) {}
+  };
+  let saved = false;
+  try { saved = localStorage.getItem("analysis") === "1"; } catch (e) {}
+  setAnalysis(saved, false);
+  aBtn.addEventListener("click", () => setAnalysis(!document.documentElement.classList.contains("analysis"), true));
+
+  // Glossary (hover definitions) loads on every page
+  const g = document.createElement("script");
+  g.src = root + "glossary.js";
+  document.body.append(g);
 
   const toggle = header.querySelector(".menu-toggle");
   toggle.addEventListener("click", () => {

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Character Map · The Daemon in the Machine</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-head">
+    <span class="mono">Dramatis personae</span>
+    <h1>Character Map</h1>
+    <p>Who's who in <em>Socrates' Daimonion</em>, and where they echo in Westworld</p>
+  </div>
+
+  <div class="map-wrap">
+    <div class="map-filters" role="group" aria-label="Show group">
+      <button class="chip active" data-filter="all">Everyone</button>
+    </div>
+    <p class="map-hint mono">Hover to trace connections · click a name to read about them</p>
+
+    <div class="map" id="map">
+      <svg class="map-lines" id="map-lines" aria-hidden="true"></svg>
+    </div>
+
+    <aside class="map-panel" id="map-panel" aria-live="polite">
+      <span class="mono panel-group">Select a character</span>
+      <h2 class="panel-name">A revolt and a riddle</h2>
+      <p class="panel-about">Plutarch's dialogue weaves a political revolt together with a philosophical debate. Pick anyone on the map to see their role, who they're tied to, and their Westworld counterpart.</p>
+      <div class="panel-echo" hidden>
+        <span class="mono">Westworld echo</span>
+        <p></p>
+      </div>
+      <div class="panel-links"></div>
+    </aside>
+  </div>
+
+  <script src="characters.js"></script>
+  <script src="site.js"></script>
+  <script>
+  (function () {
+    const map = document.getElementById("map");
+    const svg = document.getElementById("map-lines");
+    const panel = document.getElementById("map-panel");
+    const filters = document.querySelector(".map-filters");
+    const byId = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]));
+
+    // make links two-way
+    const links = new Set();
+    CHARACTERS.forEach((c) => c.links.forEach((t) => byId[t] && links.add([c.id, t].sort().join("|"))));
+    const neighbors = (id) => [...links].filter((l) => l.split("|").includes(id)).map((l) => l.split("|").find((x) => x !== id));
+
+    // build columns
+    GROUPS.forEach((g) => {
+      const col = document.createElement("div");
+      col.className = "map-col";
+      col.dataset.group = g.id;
+      col.innerHTML = `<div class="col-head"><strong>${g.label}</strong><span>${g.sub}</span></div>`;
+      CHARACTERS.filter((c) => c.group === g.id).forEach((c) => {
+        const b = document.createElement("button");
+        b.className = "node";
+        b.dataset.id = c.id;
+        b.dataset.group = c.group;
+        b.innerHTML = `<span class="dot"></span>${c.name}`;
+        col.append(b);
+      });
+      map.append(col);
+      filters.insertAdjacentHTML("beforeend", `<button class="chip" data-filter="${g.id}">${g.label}</button>`);
+    });
+
+    const nodeEl = (id) => map.querySelector(`.node[data-id="${id}"]`);
+
+    function drawLines() {
+      const box = map.getBoundingClientRect();
+      svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+      svg.innerHTML = [...links].map((l) => {
+        const [a, b] = l.split("|").map((id) => nodeEl(id).getBoundingClientRect());
+        const ax = a.left + a.width / 2 - box.left, ay = a.top + a.height / 2 - box.top;
+        const bx = b.left + b.width / 2 - box.left, by = b.top + b.height / 2 - box.top;
+        const mx = (ax + bx) / 2;
+        return `<path data-link="${l}" d="M${ax},${ay} C${mx},${ay} ${mx},${by} ${bx},${by}" />`;
+      }).join("");
+    }
+
+    function highlight(id) {
+      map.classList.toggle("focusing", !!id);
+      const near = id ? neighbors(id) : [];
+      map.querySelectorAll(".node").forEach((n) => {
+        n.classList.toggle("lit", n.dataset.id === id || near.includes(n.dataset.id));
+      });
+      svg.querySelectorAll("path").forEach((p) => p.classList.toggle("lit", !!id && p.dataset.link.split("|").includes(id)));
+    }
+
+    let selected = null;
+    function select(id) {
+      selected = id;
+      const c = byId[id];
+      map.querySelectorAll(".node").forEach((n) => n.classList.toggle("selected", n.dataset.id === id));
+      const g = GROUPS.find((g) => g.id === c.group);
+      panel.querySelector(".panel-group").textContent = g.label;
+      panel.querySelector(".panel-name").textContent = c.name;
+      panel.querySelector(".panel-about").textContent = c.about;
+      const echo = panel.querySelector(".panel-echo");
+      echo.hidden = !c.echo;
+      echo.querySelector("p").textContent = c.echo || "";
+      panel.querySelector(".panel-links").innerHTML =
+        `<span class="mono">Connected to</span>` +
+        neighbors(id).map((n) => `<button class="chip" data-goto="${n}">${byId[n].name}</button>`).join("");
+      panel.classList.remove("flash"); void panel.offsetWidth; panel.classList.add("flash");
+      highlight(id);
+      if (innerWidth < 900) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    map.addEventListener("mouseover", (e) => { const n = e.target.closest(".node"); if (n) highlight(n.dataset.id); });
+    map.addEventListener("mouseleave", () => highlight(selected));
+    map.addEventListener("click", (e) => { const n = e.target.closest(".node"); if (n) select(n.dataset.id); });
+    map.addEventListener("focusin", (e) => { const n = e.target.closest(".node"); if (n) highlight(n.dataset.id); });
+    panel.addEventListener("click", (e) => { const b = e.target.closest("[data-goto]"); if (b) { select(b.dataset.goto); nodeEl(b.dataset.goto).focus({ preventScroll: true }); } });
+
+    filters.addEventListener("click", (e) => {
+      const b = e.target.closest(".chip"); if (!b) return;
+      filters.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === b));
+      const f = b.dataset.filter;
+      map.querySelectorAll(".map-col").forEach((col) => col.classList.toggle("dim", f !== "all" && col.dataset.group !== f));
+    });
+
+    drawLines();
+    addEventListener("resize", drawLines);
+    document.fonts && document.fonts.ready.then(drawLines);
+    new ResizeObserver(drawLines).observe(map);
+  })();
+  </script>
+</body>
+</html>

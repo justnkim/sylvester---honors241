@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Maze · The Daemon in the Machine</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="maze-page">
+  <div class="maze-scroll" id="maze-scroll">
+    <div class="maze-stage">
+      <div class="maze-copy">
+        <span class="mono">Scroll to walk inward</span>
+        <h1>The Maze</h1>
+        <p>Every path through this portfolio leads toward the center, where our conclusion waits. Each voice you pass along the way is one of ours.</p>
+        <div class="maze-now" aria-live="polite">
+          <span class="mono" id="maze-step">Outer ring</span>
+          <a id="maze-current" href="team.html">Begin at the edge</a>
+        </div>
+        <ol class="maze-list" id="maze-list"></ol>
+      </div>
+      <svg class="maze-svg" id="maze-svg" viewBox="-310 -310 620 620" role="img" aria-label="A circular maze. Its path leads past each part of the portfolio toward the center."></svg>
+    </div>
+  </div>
+
+  <script src="site.js"></script>
+  <script>
+  (function () {
+    /* Stops along the path, from the outer ring to the center.
+       Member stops are filled in from the member list in site.js. */
+    const stops = [
+      { label: "Team Introduction", sub: "Simmias' House", href: "team.html#intro" },
+      { label: "Character Map", sub: "Who's who", href: "characters.html" },
+      ...SITE.members.map((m, i) => ({ label: m.name, sub: `Host ${String(i + 1).padStart(2, "0")}`, href: "members/" + m.file })),
+    ];
+    const center = { label: "The Center: Our Conclusion", sub: "Build 6", href: "team.html#conclusion" };
+
+    const svg = document.getElementById("maze-svg");
+    const NS = "http://www.w3.org/2000/svg";
+    const rings = stops.length + 1;            // walls
+    const R0 = 290, R1 = 50;                   // outer & inner wall radii
+    const step = (R0 - R1) / (rings - 1);
+    const radius = (i) => R0 - i * step;
+    const gapW = 0.22;                         // gap width in radians
+    // gap angle in each wall: alternate around the circle so the path winds
+    const gaps = Array.from({ length: rings }, (_, i) => -Math.PI / 2 + i * 2.35);
+    const pt = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+    const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    const arc = (r, a0, a1) => {
+      // clockwise arc from a0 to a1 (a1 > a0)
+      const [x0, y0] = pt(r, a0), [x1, y1] = pt(r, a1);
+      return `M${x0},${y0} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1},${y1}`;
+    };
+
+    // walls: each ring is a full circle minus its gap
+    const walls = el("g", { class: "maze-walls" });
+    gaps.forEach((g, i) => walls.append(el("path", { d: arc(radius(i), g + gapW / 2, g - gapW / 2 + Math.PI * 2) })));
+
+    // the path: in through each gap, then clockwise along the corridor to the next gap
+    let d = "", len = 0;
+    const stopAt = [];   // path length at each stop
+    const stopPts = [];
+    const outer = pt(R0 + 18, gaps[0]);
+    d += `M${outer[0]},${outer[1]}`;
+    for (let i = 0; i < rings - 1; i++) {
+      const mid = (radius(i) + radius(i + 1)) / 2;
+      const a0 = gaps[i];
+      let a1 = gaps[i + 1];
+      while (a1 <= a0 + 0.3) a1 += Math.PI * 2;
+      const [x, y] = pt(mid, a0);
+      len += i === 0 ? R0 + 18 - mid : radius(i - 1) - radius(i);
+      d += ` L${x},${y}`;
+      // dead-end walls: short radial walls in the part of the corridor the path never uses
+      const span = Math.PI * 2 - (a1 - a0);
+      [0.35, 0.7].forEach((f) => {
+        const a = a1 + span * f;
+        const [wx0, wy0] = pt(radius(i), a), [wx1, wy1] = pt(radius(i + 1), a);
+        walls.append(el("path", { d: `M${wx0},${wy0} L${wx1},${wy1}` }));
+      });
+      // stop sits halfway along this corridor
+      const half = (a0 + a1) / 2;
+      stopAt.push(len + mid * (half - a0));
+      stopPts.push(pt(mid, half));
+      const [ex, ey] = pt(mid, a1);
+      d += ` A${mid},${mid} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${ex},${ey}`;
+      len += mid * (a1 - a0);
+      // step inward to the next corridor (handled by the next L)
+      if (i === rings - 2) { d += ` L0,0`; len += mid; }
+    }
+    svg.append(walls);
+    const trail = el("path", { d, class: "maze-trail-bg" });
+    const path = el("path", { d, class: "maze-trail" });
+    svg.append(trail, path);
+    const total = path.getTotalLength();
+    path.style.strokeDasharray = total;
+    path.style.strokeDashoffset = total;
+    const scale = total / len;   // our estimate vs the browser's exact length
+
+    // stops (dots + numbers) and the center
+    const all = [...stops, center];
+    const dots = all.map((s, i) => {
+      const [x, y] = i < stops.length ? stopPts[i] : [0, 0];
+      const a = el("a", { href: s.href, class: "maze-stop" + (i === stops.length ? " center" : ""), "aria-label": s.label });
+      a.append(el("circle", { cx: x, cy: y, r: i === stops.length ? 22 : 11 }));
+      const t = el("text", { x, y: y + 4, "text-anchor": "middle" });
+      t.textContent = i === stops.length ? "◆" : i + 1;
+      a.append(t);
+      svg.append(a);
+      return a;
+    });
+    stopAt.push(len);
+
+    const list = document.getElementById("maze-list");
+    list.innerHTML = all.map((s, i) => `<li><a href="${s.href}"><span class="mono">${i < stops.length ? String(i + 1).padStart(2, "0") : "◆"}</span>${s.label}</a></li>`).join("");
+    const items = [...list.children];
+    const cur = document.getElementById("maze-current");
+    const stepEl = document.getElementById("maze-step");
+
+    const scroller = document.getElementById("maze-scroll");
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function update() {
+      const r = scroller.getBoundingClientRect();
+      const p = reduce ? 1 : Math.min(1, Math.max(0, -r.top / (r.height - innerHeight)));
+      const drawn = p * total;
+      path.style.strokeDashoffset = total - drawn;
+      let reached = -1;
+      stopAt.forEach((L, i) => { if (drawn >= L * scale - 2) reached = i; });
+      dots.forEach((dEl, i) => { dEl.classList.toggle("reached", i <= reached); dEl.classList.toggle("here", i === reached); });
+      items.forEach((li, i) => { li.classList.toggle("reached", i <= reached); li.classList.toggle("here", i === reached); });
+      if (reached >= 0) {
+        const s = all[reached];
+        cur.textContent = s.label; cur.href = s.href;
+        stepEl.textContent = reached === stops.length ? "You've reached the center" : `${s.sub} · stop ${reached + 1} of ${all.length}`;
+      } else { cur.textContent = "Begin at the edge"; cur.href = all[0].href; stepEl.textContent = "Outer ring"; }
+    }
+    addEventListener("scroll", () => requestAnimationFrame(update), { passive: true });
+    addEventListener("resize", update);
+    update();
+  })();
+  </script>
+</body>
+</html>
